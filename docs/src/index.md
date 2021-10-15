@@ -1,4 +1,4 @@
-# [JSOSolvers.jl documentation](@id Home)
+# [JSOSolvers documentation](@id Home)
 
 This package provides optimization solvers curated by the
 [JuliaSmoothOptimizers](https://juliasmoothoptimizers.github.io)
