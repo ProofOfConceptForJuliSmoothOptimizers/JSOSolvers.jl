@@ -20,3 +20,4 @@ solvers = Dict(
 const SUITE = BenchmarkGroup()
 SUITE[:cutest_lbfgs] = @benchmarkable runcutest(cutest_problems, solvers)
 tune!(SUITE[:cutest_lbfgs])
+

@@ -11,8 +11,12 @@ export lbfgs, LBFGSSolver
 An implementation of a limited memory BFGS line-search method for unconstrained
 minimization.
 """
-mutable struct LBFGSSolver{T, V, Op <: AbstractLinearOperator{T}, M <: AbstractNLPModel{T, V}} <:
-               AbstractOptSolver{T, V}
+mutable struct LBFGSSolver{
+  T,
+  V,
+  Op <: AbstractLinearOperator,
+  M <: AbstractNLPModel,
+}
   x::V
   xt::V
   gx::V
@@ -22,14 +26,16 @@ mutable struct LBFGSSolver{T, V, Op <: AbstractLinearOperator{T}, M <: AbstractN
   h::LineModel{T, V, M}
 end
 
-function LBFGSSolver(nlp::M; mem::Int = 5) where {T, V, M <: AbstractNLPModel{T, V}}
+function LBFGSSolver(
+  nlp::M,
+) where {T, V, M <: AbstractNLPModel{T, V}}
   nvar = nlp.meta.nvar
   x = V(undef, nvar)
   d = V(undef, nvar)
   xt = V(undef, nvar)
   gx = V(undef, nvar)
   gt = V(undef, nvar)
-  H = InverseLBFGSOperator(T, nvar, mem = mem, scaling = true)
+  H = InverseLBFGSOperator(T, nvar, mem = 42, scaling = true)
   h = LineModel(nlp, x, d)
   Op = typeof(H)
   return LBFGSSolver{T, V, Op, M}(x, xt, gx, gt, d, H, h)
@@ -57,7 +63,6 @@ function solve!(
   max_eval::Int = -1,
   max_time::Float64 = 30.0,
   verbose::Bool = true,
-  mem::Int = 5,
 ) where {T, V}
   if !(nlp.meta.minimize)
     error("lbfgs only works for minimization problem")
@@ -111,7 +116,7 @@ function solve!(
 
     # Perform improved Armijo linesearch.
     t, good_grad, ft, nbk, nbW =
-      armijo_wolfe(h, f, slope, ∇ft, τ₁ = T(0.9999), bk_max = 25, verbose = false)
+      armijo_wolfe(h, f, slope, ∇ft, τ₁ = T(0.998), bk_max = 18, verbose = false)
 
     @info log_row(Any[iter, f, ∇fNorm, slope, nbk])
 
