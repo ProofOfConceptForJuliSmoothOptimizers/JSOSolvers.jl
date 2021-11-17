@@ -1,11 +1,10 @@
 #!/bin/bash
 
-julia --project=benchmark -E 'using Pkg; Pkg.resolve()'
-julia --project=benchmark benchmark/send_comment_to_pr.jl -o $org -r $repo -p $pullrequest -c '**Starting benchmarks!**'
-
 LOCAL_BRANCH_NAME="temp_bmark"
 git checkout $LOCAL_BRANCH_NAME -- || true
 
+julia --project=benchmark -E 'using Pkg; Pkg.resolve()'
+julia --project=benchmark benchmark/send_comment_to_pr.jl -o $org -r $repo -p $pullrequest -c '**Starting benchmarks!**'
 
 julia --project=benchmark benchmark/$1 $repo
 
