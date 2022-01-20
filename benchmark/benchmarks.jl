@@ -3,16 +3,15 @@ using BenchmarkTools
 using LinearAlgebra, Logging, Printf, SparseArrays
 
 # JSO packages
-using Krylov, LinearOperators, NLPModels, NLPModelsModifiers, SolverBenchmark, SolverCore, SolverTools, ADNLPModels, SolverTest, JSOSolvers, CUTEst
+using Krylov, LinearOperators, NLPModels, NLPModelsModifiers, NLPModelsJuMP, SolverBenchmark, SolverCore, SolverTools, ADNLPModels, SolverTest, JSOSolvers, OptimizationProblems, OptimizationProblems.PureJuMP
 
-problem_names = CUTEst.select(;only_free_var=true, max_con=0, min_var=5, max_var=500)
-cutest_problems = ((p, CUTEstModel(p)) for p in problem_names)
+problems = (MathOptNLPModel(eval(p)(),name=string(p)) for p ∈ filter(x -> x != :PureJuMP, names(OptimizationProblems.PureJuMP)))
+problems = Iterators.filter(p -> unconstrained(p) &&  5 ≤ get_nvar(p) ≤ 1000 && get_minimize(p), problems)
 
 const SUITE = BenchmarkGroup()
-SUITE[:cutest_lbfgs] = BenchmarkGroup()
+SUITE[:lbfgs] = BenchmarkGroup()
 
-for (p, nlp) ∈ cutest_problems
-  SUITE[:cutest_lbfgs][p] = @benchmarkable lbfgs($nlp)
-  finalize(nlp)
+for nlp ∈ problems
+  SUITE[:lbfgs][get_name(nlp)] = @benchmarkable lbfgs($nlp)
 end
 
