@@ -35,7 +35,7 @@ function LBFGSSolver(
   xt = V(undef, nvar)
   gx = V(undef, nvar)
   gt = V(undef, nvar)
-  H = InverseLBFGSOperator(T, nvar, mem = 93, scaling = true)
+  H = InverseLBFGSOperator(T, nvar, mem = 95, scaling = true)
   h = LineModel(nlp, x, d)
   Op = typeof(H)
   return LBFGSSolver{T, V, Op, M}(x, xt, gx, gt, d, H, h)
@@ -116,7 +116,7 @@ function solve!(
 
     # Perform improved Armijo linesearch.
     t, good_grad, ft, nbk, nbW =
-      armijo_wolfe(h, f, slope, ∇ft, τ₁ = T(0.956277), bk_max = 26, verbose = false)
+      armijo_wolfe(h, f, slope, ∇ft, τ₁ = T(0.959821), bk_max = 17, verbose = false)
 
     @info log_row(Any[iter, f, ∇fNorm, slope, nbk])
 
