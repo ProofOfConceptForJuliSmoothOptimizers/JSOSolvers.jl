@@ -77,17 +77,26 @@ mutable struct LBFGSSolver{T, V, Op <: AbstractLinearOperator{T}, M <: AbstractN
   h::LineModel{T, V, M}
 end
 
-function LBFGSSolver(nlp::M; mem::Int = 5) where {T, V, M <: AbstractNLPModel{T, V}}
+function LBFGSSolver(nlp::M, params::Vector{AlgorithmicParameter}=[]) where {T, V, M <: AbstractNLPModel{T, V}}
   nvar = nlp.meta.nvar
   x = V(undef, nvar)
   d = V(undef, nvar)
   xt = V(undef, nvar)
   gx = V(undef, nvar)
   gt = V(undef, nvar)
-  H = InverseLBFGSOperator(T, nvar, mem = mem, scaling = true)
+  parameters = Dict("mem" => AlgorithmicParameter(5, IntegerRange(1, 100), "mem"),
+            "τ₁" => AlgorithmicParameter(Float64(0.99), RealInterval(Float64(1.0e-4), 1.0), "τ₁"),
+            "bk_max" => AlgorithmicParameter(25, IntegerRange(10, 30), "bk_max")
+          )
+  for p ∈ params
+    haskey(parameters, name(p)) || continue
+    parameters[name(p)] = p
+  end
+
+  H = InverseLBFGSOperator(T, nvar, mem = default(parameters["mem"]), scaling = true)
   h = LineModel(nlp, x, d)
   Op = typeof(H)
-  return LBFGSSolver{T, V, Op, M}(x, xt, gx, gt, d, H, h)
+  return LBFGSSolver{T, V, Op, M}(parameters, x, xt, gx, gt, d, H, h)
 end
 
 function SolverCore.reset!(solver::LBFGSSolver)
@@ -101,12 +110,12 @@ function SolverCore.reset!(solver::LBFGSSolver, nlp::AbstractNLPModel)
 end
 
 @doc (@doc LBFGSSolver) function lbfgs(
-  nlp::AbstractNLPModel;
+  nlp::AbstractNLPModel, parameters::Vector{AlgorithmicParameter}=[];
   x::V = nlp.meta.x0,
   mem::Int = 5,
   kwargs...,
 ) where {V}
-  solver = LBFGSSolver(nlp; mem = mem)
+  solver = LBFGSSolver(nlp, parameters)
   return solve!(solver, nlp; x = x, kwargs...)
 end
 
@@ -124,7 +133,6 @@ function SolverCore.solve!(
   τ₁::T = T(0.9999),
   bk_max::Int = 25,
   verbose::Int = 0,
-  verbose_subsolver::Int = 0,
 ) where {T, V}
   if !(nlp.meta.minimize)
     error("lbfgs only works for minimization problem")
@@ -195,7 +203,7 @@ function SolverCore.solve!(
 
     # Perform improved Armijo linesearch.
     t, good_grad, ft, nbk, nbW =
-      armijo_wolfe(h, f, slope, ∇ft, τ₁ = τ₁, bk_max = bk_max, verbose = Bool(verbose_subsolver))
+      armijo_wolfe(h, f, slope, ∇ft, τ₁ = default(solver.parameters["τ₁"]), bk_max = default(solver.parameters["bk_max"]), verbose = false)
 
     verbose > 0 &&
       mod(stats.iter, verbose) == 0 &&
