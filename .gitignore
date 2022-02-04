@@ -1,5 +1,6 @@
 docs/build
 docs/Manifest.toml
+tuning/plots/
 */.DS_Store
 .DS_Store
 Manifest.toml
