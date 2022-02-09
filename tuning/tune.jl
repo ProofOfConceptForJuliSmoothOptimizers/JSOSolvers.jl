@@ -8,7 +8,7 @@ using BenchmarkTools
 using Random
 using JSON
 
-const IS_LOAD_BALANCING = false
+const IS_LOAD_BALANCING = true
 const PATH_PREFIX = IS_LOAD_BALANCING ? "" : "no_"
 const BASE_FILE_PATH = joinpath(@__DIR__, "plots", "$(PATH_PREFIX)load_balancing")
 # 1. Launch workers
