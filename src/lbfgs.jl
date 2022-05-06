@@ -77,26 +77,20 @@ mutable struct LBFGSSolver{T, V, Op <: AbstractLinearOperator{T}, M <: AbstractN
   h::LineModel{T, V, M}
 end
 
-function LBFGSSolver(nlp::M, params::Vector{AlgorithmicParameter}=[]) where {T, V, M <: AbstractNLPModel{T, V}}
+function LBFGSSolver(nlp::M; params::NamedTuple=NamedTuple()) where {T, V, M <: AbstractNLPModel{T, V}}
   nvar = nlp.meta.nvar
+  p = merge(get_default_lbfgs_parameters(T), params)
   x = V(undef, nvar)
   d = V(undef, nvar)
   xt = V(undef, nvar)
   gx = V(undef, nvar)
   gt = V(undef, nvar)
-  parameters = Dict("mem" => AlgorithmicParameter(5, IntegerRange(1, 100), "mem"),
-            "τ₁" => AlgorithmicParameter(Float64(0.99), RealInterval(Float64(1.0e-4), 1.0), "τ₁"),
-            "bk_max" => AlgorithmicParameter(25, IntegerRange(10, 30), "bk_max")
-          )
-  for p ∈ params
-    haskey(parameters, name(p)) || continue
-    parameters[name(p)] = p
-  end
 
-  H = InverseLBFGSOperator(T, nvar, mem = default(parameters["mem"]), scaling = true)
+  H = InverseLBFGSOperator(T, nvar, mem = p.mem, scaling = p.scaling)
   h = LineModel(nlp, x, d)
   Op = typeof(H)
-  return LBFGSSolver{T, V, Op, M}(parameters, x, xt, gx, gt, d, H, h)
+
+  return LBFGSSolver{T, V, Op, M}(p, x, xt, gx, gt, d, H, h)
 end
 
 function SolverCore.reset!(solver::LBFGSSolver)
@@ -110,12 +104,12 @@ function SolverCore.reset!(solver::LBFGSSolver, nlp::AbstractNLPModel)
 end
 
 @doc (@doc LBFGSSolver) function lbfgs(
-  nlp::AbstractNLPModel, parameters::Vector{AlgorithmicParameter}=[];
+  nlp::AbstractNLPModel;
   x::V = nlp.meta.x0,
   mem::Int = 5,
   kwargs...,
 ) where {V}
-  solver = LBFGSSolver(nlp, parameters)
+  solver = LBFGSSolver(nlp;params=params)
   return solve!(solver, nlp; x = x, kwargs...)
 end
 
@@ -203,7 +197,7 @@ function SolverCore.solve!(
 
     # Perform improved Armijo linesearch.
     t, good_grad, ft, nbk, nbW =
-      armijo_wolfe(h, f, slope, ∇ft, τ₁ = default(solver.parameters["τ₁"]), bk_max = default(solver.parameters["bk_max"]), verbose = false)
+      armijo_wolfe(h, f, slope, ∇ft, τ₁ = solver.p.τ₁, bk_max = solver.p.bk_max, verbose = false)
 
     verbose > 0 &&
       mod(stats.iter, verbose) == 0 &&
