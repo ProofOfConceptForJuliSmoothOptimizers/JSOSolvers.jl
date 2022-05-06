@@ -4,7 +4,7 @@ module JSOSolvers
 using LinearAlgebra, Logging, Printf, OrderedCollections
 
 # JSO packages
-using Krylov, LinearOperators, NLPModels, NLPModelsModifiers, SolverCore, SolverTools, SolverParameters
+using Krylov, LinearOperators, NLPModels, NLPModelsModifiers, SolverCore, SolverTools
 
 import Krylov.solve!
 export solve!
@@ -20,7 +20,7 @@ abstract type AbstractOptSolver{T, V} end
 
 # Unconstrained solvers
 include("lbfgs.jl")
-include("trunk.jl")
+# include("trunk.jl")
 
 # Unconstrained solvers for NLS
 include("trunkls.jl")

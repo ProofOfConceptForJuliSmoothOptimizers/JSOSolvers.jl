@@ -48,7 +48,7 @@ stats = solve!(solver, nlp)
 """
 mutable struct LBFGSSolver{T, V, Op <: AbstractLinearOperator{T}, M <: AbstractNLPModel{T, V}} <:
                AbstractOptSolver{T, V}
-  parameters::Dict{String, AlgorithmicParameter}
+  p::NamedTuple
   x::V
   xt::V
   gx::V
@@ -58,38 +58,50 @@ mutable struct LBFGSSolver{T, V, Op <: AbstractLinearOperator{T}, M <: AbstractN
   h::LineModel{T, V, M}
 end
 
-function LBFGSSolver(nlp::M, params::Vector{AlgorithmicParameter}=[]) where {T, V, M <: AbstractNLPModel{T, V}}
+function LBFGSSolver(nlp::M; params::NamedTuple=NamedTuple()) where {T, V, M <: AbstractNLPModel{T, V}}
   nvar = nlp.meta.nvar
+  p = merge(get_default_lbfgs_parameters(T), params)
   x = V(undef, nvar)
   d = V(undef, nvar)
   xt = V(undef, nvar)
   gx = V(undef, nvar)
   gt = V(undef, nvar)
-  parameters = Dict("mem" => AlgorithmicParameter(5, IntegerRange(1, 100), "mem"),
-            "τ₁" => AlgorithmicParameter(Float64(0.99), RealInterval(Float64(1.0e-4), 1.0), "τ₁"),
-            "bk_max" => AlgorithmicParameter(25, IntegerRange(10, 30), "bk_max")
-          )
-  for p ∈ params
-    haskey(parameters, name(p)) || continue
-    parameters[name(p)] = p
-  end
 
-  H = InverseLBFGSOperator(T, nvar, mem = default(parameters["mem"]), scaling = true)
+  H = InverseLBFGSOperator(T, nvar, mem = p.mem, scaling = p.scaling)
   h = LineModel(nlp, x, d)
   Op = typeof(H)
-  return LBFGSSolver{T, V, Op, M}(parameters, x, xt, gx, gt, d, H, h)
+
+  return LBFGSSolver{T, V, Op, M}(p, x, xt, gx, gt, d, H, h)
 end
 
 function LinearOperators.reset!(solver::LBFGSSolver)
   reset!(solver.H)
 end
 
+function get_default_lbfgs_parameters(T::Type)
+  return (mem=5, scaling=true, τ₁=T(0.999), bk_max=20)
+end
+
+function get_default_lbfgs_parameters(s::S) where S <: LBFGSSolver
+  return s.p
+end
+
 @doc (@doc LBFGSSolver) function lbfgs(
-  nlp::AbstractNLPModel, parameters::Vector{AlgorithmicParameter}=[];
+  nlp::AbstractNLPModel{T,V}, params::Vector{<:Real};
+  x::V = nlp.meta.x0,
+  kwargs...,
+) where {T,V}
+  new_params = NamedTuple{keys(get_default_lbfgs_parameters(T))}(v for v in params)
+  solver = LBFGSSolver(nlp;params=new_params)
+  return solve!(solver, nlp; x = x, kwargs...)
+end
+
+@doc (@doc LBFGSSolver) function lbfgs(
+  nlp::AbstractNLPModel;
   x::V = nlp.meta.x0,
   kwargs...,
 ) where {V}
-  solver = LBFGSSolver(nlp, parameters)
+  solver = LBFGSSolver(nlp;params=params)
   return solve!(solver, nlp; x = x, kwargs...)
 end
 
@@ -154,7 +166,7 @@ function solve!(
 
     # Perform improved Armijo linesearch.
     t, good_grad, ft, nbk, nbW =
-      armijo_wolfe(h, f, slope, ∇ft, τ₁ = default(solver.parameters["τ₁"]), bk_max = default(solver.parameters["bk_max"]), verbose = false)
+      armijo_wolfe(h, f, slope, ∇ft, τ₁ = solver.p.τ₁, bk_max = solver.p.bk_max, verbose = false)
 
     verbose > 0 && mod(iter, verbose) == 0 && @info log_row(Any[iter, f, ∇fNorm, slope, nbk])
 
