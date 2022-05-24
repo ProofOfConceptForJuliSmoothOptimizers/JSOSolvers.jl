@@ -20,7 +20,7 @@ abstract type AbstractOptSolver{T, V} end
 
 # Unconstrained solvers
 include("lbfgs.jl")
-# include("trunk.jl")
+include("trunk.jl")
 
 # Unconstrained solvers for NLS
 include("trunkls.jl")

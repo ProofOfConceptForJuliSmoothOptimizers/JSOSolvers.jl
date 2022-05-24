@@ -87,12 +87,12 @@ function get_default_lbfgs_parameters(s::S) where S <: LBFGSSolver
 end
 
 @doc (@doc LBFGSSolver) function lbfgs(
-  nlp::AbstractNLPModel{T,V}, params::Vector{<:Real};
+  nlp::AbstractNLPModel{T,V}, params::NamedTuple;
   x::V = nlp.meta.x0,
   kwargs...,
 ) where {T,V}
-  new_params = NamedTuple{keys(get_default_lbfgs_parameters(T))}(v for v in params)
-  solver = LBFGSSolver(nlp;params=new_params)
+  # new_params = NamedTuple{keys(get_default_lbfgs_parameters(T))}(v for v in params)
+  solver = LBFGSSolver(nlp;params=params)
   return solve!(solver, nlp; x = x, kwargs...)
 end
 
@@ -101,7 +101,7 @@ end
   x::V = nlp.meta.x0,
   kwargs...,
 ) where {V}
-  solver = LBFGSSolver(nlp;params=params)
+  solver = LBFGSSolver(nlp;)
   return solve!(solver, nlp; x = x, kwargs...)
 end
 
