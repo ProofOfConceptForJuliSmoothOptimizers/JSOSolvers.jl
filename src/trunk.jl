@@ -1,6 +1,8 @@
 export trunk, TrunkSolver
 
-trunk(nlp::AbstractNLPModel, params::Vector{<:AlgorithmicParameter}=Vector{AlgorithmicParameter}(); variant = :Newton, kwargs...) = trunk(Val(variant), nlp, params; kwargs...)
+trunk(nlp::AbstractNLPModel, params::NamedTuple; variant = :Newton, kwargs...) = trunk(Val(variant), nlp, params; kwargs...)
+
+trunk(nlp::AbstractNLPModel; variant = :Newton, kwargs...) = trunk(Val(variant), nlp; kwargs...)
 
 """
     trunk(nlp; kwargs...)
@@ -100,10 +102,11 @@ end
 
 function TrunkSolver(
   nlp::AbstractNLPModel{T, V};
-  params::Dict{String, <:AlgorithmicParameter}=Dict{String, AlgorithmicParameter}(),
+  params::NamedTuple=NamedTuple(),
   subsolver_type::Type{<:KrylovSolver} = CgSolver,
 ) where {T, V <: AbstractVector{T}}
   nvar = nlp.meta.nvar
+  p = merge(get_default_trunk_parameters(T), params)
   x = V(undef, nvar)
   xt = V(undef, nvar)
   gx = V(undef, nvar)
@@ -111,22 +114,16 @@ function TrunkSolver(
   gn = isa(nlp, QuasiNewtonModel) ? V(undef, nvar) : V(undef, 0)
   Hs = V(undef, nvar)
 
-  parameters = get_default_trunk_parameters(T)
-  for (p_name, p) ∈ params
-    haskey(parameters, p_name) || continue
-    parameters[p_name] = p
-  end
-
   subsolver = subsolver_type(nvar, nvar, V)
   Sub = typeof(subsolver)
   H = hess_op!(nlp, x, Hs)
   Op = typeof(H)
   tr = TrustRegion(gt, one(T);
-          acceptance_threshold=default(parameters["acceptance_threshold"]),
-          decrease_factor=default(parameters["decrease_factor"]),
-          increase_factor=default(parameters["increase_factor"])
+          acceptance_threshold=p.acceptance_threshold,
+          decrease_factor=p.decrease_factor,
+          increase_factor=p.increase_factor
         )
-  return TrunkSolver{T, V, Sub, Op}(parameters, x, xt, gx, gt, gn, Hs, subsolver, H, tr)
+  return TrunkSolver{T, V, Sub, Op}(p, x, xt, gx, gt, gn, Hs, subsolver, H, tr)
 end
 
 function SolverCore.reset!(solver::TrunkSolver)
@@ -146,13 +143,24 @@ end
 @doc (@doc TrunkSolver) function trunk(
   ::Val{:Newton},
   nlp::AbstractNLPModel,
-  parameters::Vector{<:AlgorithmicParameter};
+  params::NamedTuple;
   x::V = nlp.meta.x0,
   subsolver_type::Type{<:KrylovSolver} = CgSolver,
   kwargs...,
 ) where {V}
-  trunk_params = Dict{String, AlgorithmicParameter}(name(p) => p for p in parameters)
-  solver = TrunkSolver(nlp;params=trunk_params, subsolver_type = subsolver_type)
+  # new_params = NamedTuple{keys(get_default_trunk_parameters(T))}(v for v in params)
+  solver = TrunkSolver(nlp;params=params, subsolver_type = subsolver_type)
+  return solve!(solver, nlp; x = x, kwargs...)
+end
+
+@doc (@doc TrunkSolver) function trunk(
+  ::Val{:Newton},
+  nlp::AbstractNLPModel;
+  x::V = nlp.meta.x0,
+  subsolver_type::Type{<:KrylovSolver} = CgSolver,
+  kwargs...,
+) where {V}
+  solver = TrunkSolver(nlp; subsolver_type = subsolver_type)
   return solve!(solver, nlp; x = x, kwargs...)
 end
 
@@ -169,8 +177,8 @@ function SolverCore.solve!(
   max_iter::Int = typemax(Int),
   max_time::Float64 = 30.0,
   bk_max::Int = 10,
-  monotone::Bool = default(solver.parameters["monotone"]),
-  nm_itmax::Int = default(solver.parameters["nm_itmax"]),
+  monotone::Bool = solver.p.monotone,
+  nm_itmax::Int = solver.p.nm_itmax,
   verbose::Int = 0,
   verbose_subsolver::Int = 0,
 ) where {T, V <: AbstractVector{T}}
@@ -200,7 +208,7 @@ function SolverCore.solve!(
   cgtol = one(T)  # Must be ≤ 1.
 
   # Armijo linesearch parameter.
-  β = default(parameters["β"])
+  β = solver.p.β
 
   f = obj(nlp, x)
   grad!(nlp, x, ∇f)
@@ -309,7 +317,7 @@ function SolverCore.solve!(
         done = true
         continue
       end
-      α = default(parameters["α"])
+      α = solver.p.α
       while (bk < bk_max) && (ft > f + β * α * slope)
         bk = bk + 1
         α /= T(1.2)

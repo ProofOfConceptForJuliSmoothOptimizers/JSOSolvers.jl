@@ -109,7 +109,7 @@ end
   mem::Int = 5,
   kwargs...,
 ) where {V}
-  solver = LBFGSSolver(nlp;params=params)
+  solver = LBFGSSolver(nlp;)
   return solve!(solver, nlp; x = x, kwargs...)
 end
 

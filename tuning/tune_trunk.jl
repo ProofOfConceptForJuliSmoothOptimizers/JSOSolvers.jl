@@ -1,79 +1,66 @@
 using Pkg
 using Distributed
-using SolverParameters
 using SolverTuning
-using SolverCore
-using NLPModels
-using BenchmarkTools
 
 # 1. Launch workers
-init_workers(;nb_nodes=20, exec_flags="--project=$(@__DIR__)")
+init_workers(;exec_flags="--project=$(@__DIR__)")
 
 # 2. make modules available to all workers:
 @everywhere begin
-  using JSOSolvers, 
+  using JSOSolvers,
   SolverTuning,
   OptimizationProblems,
   OptimizationProblems.ADNLPProblems,
   NLPModels,
-  ADNLPModels
+  ADNLPModels,
+  Statistics,
+  BBModels
 end
 
-T = Float64
+
 # 3. Setup problems
+T = Float64
 problems = (eval(p)(type=Val(T)) for p ∈ filter(x -> x != :ADNLPProblems && x != :scosine, names(OptimizationProblems.ADNLPProblems)))
-problems = Iterators.filter(p -> unconstrained(p) &&  100 ≤ get_nvar(p) ≤ 1000 && get_minimize(p), problems)
+problems = Iterators.filter(p -> unconstrained(p) &&  1 ≤ get_nvar(p) ≤ 1000 && get_minimize(p), problems)
 
-
-# Function that will count failures
-function count_failures(bmark_results::Dict{Int, Float64}, stats_results::Dict{Int, AbstractExecutionStats})
-  failure_penalty = 0.0   
-  for (nlp, stats) in stats_results
-    is_failure(stats) || continue
-    failure_penalty += 25.0 * bmark_results[nlp]
-  end
-  return failure_penalty
-end
-
-function is_failure(stats::AbstractExecutionStats)
-  failure_status = [:exception, :infeasible, :max_eval, :max_iter, :max_time, :stalled, :neg_pred]
-  return any(s -> s == stats.status, failure_status)
-end
-
-# 5. define user's blackbox:
-function my_black_box(args...;kwargs...)
-  bmark_results, stats_results, solver_results = eval_solver(trunk, args...;kwargs...)
-  bmark_results_output = Dict(pb_id => (median(bmark).time/1.0e9 * median(bmark).memory/1.0e6) for (pb_id, bmark) ∈ bmark_results)
-  
-  total_output = sum(values(bmark_results_output))
-  failure_penalty = count_failures(bmark_results_output, stats_results)
-  bb_result = total_output + failure_penalty
-  @info "failure_penalty: $failure_penalty"
-
-  return [bb_result], bmark_results_output, stats_results
-end
+# 4. get parameters from solver:
 solver = TrunkSolver(first(problems))
-kwargs = Dict{Symbol, Any}(:verbose => 0, :max_time => 60.0)
-black_box = BlackBox(solver, collect(values(solver.parameters)), my_black_box, kwargs)        
+x = solver.p
 
-# 7. define problem suite
-param_optimization_problem =
-  ParameterOptimizationProblem(black_box, problems)
+# 5. Define a BBModel problem:
 
-# named arguments are options to pass to Nomad
-create_nomad_problem!(
-  param_optimization_problem;
-  display_all_eval = true,
-  # max_time = 300,
-  # max_bb_eval =300,
-  display_stats = ["BBE", "EVAL", "SOL", "OBJ"],
+# 5.1 define a function that executes your solver. It must take an nlp followed by a vector of real values:
+@everywhere function solver_func(nlp::AbstractNLPModel, p::NamedTuple)
+  return trunk(nlp, p; verbose=0, max_time=60.0)
+end
+
+# 5.2 Define a function that takes a ProblemMetric object. This function must return one real number.
+
+@everywhere function aux_func(p_metric::ProblemMetrics)
+  median_time = median(get_times(p_metric))
+  memory = get_memory(p_metric)
+  solved = get_solved(p_metric)
+  counters = get_counters(p_metric)
+
+  return median_time + memory + counters.neval_obj + (Float64(!solved) * 5.0 * median_time)
+end
+
+# 5.4 Define the BBModel:
+problems = collect(problems)
+# problems = [p for (i,p) in zip(1:3, problems)]
+lvar = Real[false, 20, 5, T(0.0), T(0.0), zero(T), zero(T), one(T)]
+uvar = Real[true, 30, 15, T(1.0), T(1.0), T(0.9499), one(T), T(2.0)]
+lcon = [eps(T)]
+ucon = [T(Inf)]
+@everywhere function c(x)
+  return [x[8] - x[7];]
+end
+bbmodel = BBModel(x, solver_func, aux_func, c, lcon, ucon, problems;lvar=lvar, uvar=uvar)
+
+solve_with_nomad(bbmodel;
+display_all_eval = true,
+# max_time = 300,
+# max_bb_eval =3,
+display_stats = ["BBE", "EVAL", "SOL", "OBJ"],
 )
 
-# 8. Execute Nomad
-result = solve_with_nomad!(param_optimization_problem)
-@info ("Best feasible parameters: $(result.x_best_feas)")
-
-for p in black_box.solver_params
-    @info "$(name(p)): $(default(p))"
-end
-rmprocs(workers())

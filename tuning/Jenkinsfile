@@ -65,9 +65,7 @@ pipeline {
       }
         steps {
           sh """
-            julia --project -E 'using Pkg; Pkg.add(url="https://github.com/MonssafToukal/SolverParameters.jl.git");
-              Pkg.update()'
-            julia --project=tuning -E 'using Pkg; Pkg.add(url="https://github.com/MonssafToukal/SolverParameters.jl.git");
+            julia --project=tuning -E 'using Pkg; Pkg.add(url="https://github.com/ProofOfConceptForJuliSmoothOptimizers/BBModels.jl.git");
               Pkg.add(url="https://github.com/ProofOfConceptForJuliSmoothOptimizers/SolverTuning.jl.git");
               Pkg.develop(PackageSpec(url=joinpath(".")));
             '
@@ -105,6 +103,7 @@ pipeline {
       git clean -fd
       git reset --hard
       '''
+      sh 'killall tail || true'
     }
   }
 }

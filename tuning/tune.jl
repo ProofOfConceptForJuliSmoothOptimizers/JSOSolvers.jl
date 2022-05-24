@@ -25,13 +25,13 @@ problems = Iterators.filter(p -> unconstrained(p) &&  100 ≤ get_nvar(p) ≤ 10
 
 # 4. get parameters from solver:
 solver = LBFGSSolver(first(problems))
-x = collect(solver.p)
+x = solver.p
 
 # 5. Define a BBModel problem:
 
 # 5.1 define a function that executes your solver. It must take an nlp followed by a vector of real values:
-@everywhere function solver_func(nlp::AbstractNLPModel, v::Vector{<:Real})
-  return lbfgs(nlp, v; verbose=0, max_time=60.0)
+@everywhere function solver_func(nlp::AbstractNLPModel, p::NamedTuple)
+  return lbfgs(nlp, p; verbose=0, max_time=60.0)
 end
 
 # 5.2 Define a function that takes a ProblemMetric object. This function must return one real number.
@@ -47,13 +47,13 @@ end
 
 # 5.4 Define the BBModel:
 problems = collect(problems)
-# problems = [p for (i,p) in zip(1:10, problems)]
+# problems = [p for (i,p) in zip(1:3, problems)]
 bbmodel = BBModel(x, solver_func, aux_func, problems;lvar=Real[1, false, T(0.0), 10], uvar=Real[100, true, T(0.9999), 30])
 
 solve_with_nomad(bbmodel;
 display_all_eval = true,
 # max_time = 300,
-max_bb_eval =10,
+# max_bb_eval =3,
 display_stats = ["BBE", "EVAL", "SOL", "OBJ"],
 )
 
