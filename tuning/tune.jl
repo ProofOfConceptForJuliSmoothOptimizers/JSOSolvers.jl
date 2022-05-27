@@ -46,14 +46,15 @@ end
 end
 
 # 5.4 Define the BBModel:
-problems = collect(problems)
-# problems = [p for (i,p) in zip(1:3, problems)]
+# problems = collect(problems)
+problems = [p for (i,p) in zip(1:40, problems)]
 bbmodel = BBModel(x, solver_func, aux_func, problems;lvar=Real[1, false, T(0.0), 10], uvar=Real[100, true, T(0.9999), 30])
 
-solve_with_nomad(bbmodel;
+best_params, param_opt_problem = solve_bb_model(bbmodel;
 display_all_eval = true,
 # max_time = 300,
-# max_bb_eval =3,
+max_bb_eval =50,
 display_stats = ["BBE", "EVAL", "SOL", "OBJ"],
 )
 
+param_opt_problem

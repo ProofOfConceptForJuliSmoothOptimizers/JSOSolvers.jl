@@ -57,7 +57,7 @@ ucon = [T(Inf)]
 end
 bbmodel = BBModel(x, solver_func, aux_func, c, lcon, ucon, problems;lvar=lvar, uvar=uvar)
 
-solve_with_nomad(bbmodel;
+solve_bb_model(bbmodel;
 display_all_eval = true,
 # max_time = 300,
 # max_bb_eval =3,
