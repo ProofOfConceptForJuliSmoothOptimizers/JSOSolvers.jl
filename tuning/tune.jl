@@ -1,9 +1,10 @@
 using Pkg
 using Distributed
 using SolverTuning
+using JSON
 
 # 1. Launch workers
-init_workers(;nb_nodes=23, exec_flags="--project=$(@__DIR__)")
+init_workers(; exec_flags="--project=$(@__DIR__)")
 
 # 2. make modules available to all workers:
 @everywhere begin
@@ -46,15 +47,19 @@ end
 end
 
 # 5.4 Define the BBModel:
-# problems = collect(problems)
-problems = [p for (i,p) in zip(1:40, problems)]
+problems = collect(problems)
+# problems = [p for (i,p) in zip(1:40, problems)]
 bbmodel = BBModel(x, solver_func, aux_func, problems;lvar=Real[1, false, T(0.0), 10], uvar=Real[100, true, T(0.9999), 30])
 
-best_params, param_opt_problem = solve_bb_model(bbmodel;
+best_params, param_opt_problem = solve_bb_model(bbmodel;lb_choice=:C,
 display_all_eval = true,
 # max_time = 300,
-max_bb_eval =50,
-display_stats = ["BBE", "EVAL", "SOL", "OBJ"],
+# max_bb_eval =100,
+display_stats = ["BBE", "SOL", "CONS_H", "TIME", "OBJ"],
 )
 
-param_opt_problem
+# worker_data = Dict(w_id => [sum(sum(get_times(p);init=0.0) for p in iteration;init=0.0) for iteration in data] for (w_id, data) in param_opt_problem.worker_data)
+# file_path = joinpath(@__DIR__, "plots", "combine", "lbfgs_worker_times_combine_algorithm.json")
+# open(file_path, "w") do f
+#   JSON.print(f, worker_data)
+# end
