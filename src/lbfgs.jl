@@ -124,8 +124,8 @@ function SolverCore.solve!(
   max_eval::Int = -1,
   max_iter::Int = typemax(Int),
   max_time::Float64 = 30.0,
-  τ₁::T = T(0.9999),
-  bk_max::Int = 25,
+  τ₁::T = solver.p.τ₁,
+  bk_max::Int = solver.p.bk_max,
   verbose::Int = 0,
 ) where {T, V}
   if !(nlp.meta.minimize)
@@ -197,7 +197,7 @@ function SolverCore.solve!(
 
     # Perform improved Armijo linesearch.
     t, good_grad, ft, nbk, nbW =
-      armijo_wolfe(h, f, slope, ∇ft, τ₁ = solver.p.τ₁, bk_max = solver.p.bk_max, verbose = false)
+      armijo_wolfe(h, f, slope, ∇ft, τ₁ = τ₁, bk_max = bk_max, verbose = false)
 
     verbose > 0 &&
       mod(stats.iter, verbose) == 0 &&
