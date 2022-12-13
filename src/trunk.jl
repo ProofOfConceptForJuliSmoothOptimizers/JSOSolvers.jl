@@ -1,7 +1,5 @@
 export trunk, TrunkSolver
 
-trunk(nlp::AbstractNLPModel, params::NamedTuple; variant = :Newton, kwargs...) = trunk(Val(variant), nlp, params; kwargs...)
-
 trunk(nlp::AbstractNLPModel; variant = :Newton, kwargs...) = trunk(Val(variant), nlp; kwargs...)
 
 """
@@ -102,28 +100,21 @@ end
 
 function TrunkSolver(
   nlp::AbstractNLPModel{T, V};
-  params::NamedTuple=NamedTuple(),
   subsolver_type::Type{<:KrylovSolver} = CgSolver,
 ) where {T, V <: AbstractVector{T}}
   nvar = nlp.meta.nvar
-  p = merge(get_default_trunk_parameters(T), params)
   x = V(undef, nvar)
   xt = V(undef, nvar)
   gx = V(undef, nvar)
   gt = V(undef, nvar)
   gn = isa(nlp, QuasiNewtonModel) ? V(undef, nvar) : V(undef, 0)
   Hs = V(undef, nvar)
-
   subsolver = subsolver_type(nvar, nvar, V)
   Sub = typeof(subsolver)
   H = hess_op!(nlp, x, Hs)
   Op = typeof(H)
-  tr = TrustRegion(gt, one(T);
-          acceptance_threshold=p.acceptance_threshold,
-          decrease_factor=p.decrease_factor,
-          increase_factor=p.increase_factor
-        )
-  return TrunkSolver{T, V, Sub, Op}(p, x, xt, gx, gt, gn, Hs, subsolver, H, tr)
+  tr = TrustRegion(gt, one(T))
+  return TrunkSolver{T, V, Sub, Op}(x, xt, gx, gt, gn, Hs, subsolver, H, tr)
 end
 
 function SolverCore.reset!(solver::TrunkSolver)
@@ -142,25 +133,12 @@ end
 
 @doc (@doc TrunkSolver) function trunk(
   ::Val{:Newton},
-  nlp::AbstractNLPModel,
-  params::NamedTuple;
-  x::V = nlp.meta.x0,
-  subsolver_type::Type{<:KrylovSolver} = CgSolver,
-  kwargs...,
-) where {V}
-  # new_params = NamedTuple{keys(get_default_trunk_parameters(T))}(v for v in params)
-  solver = TrunkSolver(nlp;params=params, subsolver_type = subsolver_type)
-  return solve!(solver, nlp; x = x, kwargs...)
-end
-
-@doc (@doc TrunkSolver) function trunk(
-  ::Val{:Newton},
   nlp::AbstractNLPModel;
   x::V = nlp.meta.x0,
   subsolver_type::Type{<:KrylovSolver} = CgSolver,
   kwargs...,
 ) where {V}
-  solver = TrunkSolver(nlp; subsolver_type = subsolver_type)
+  solver = TrunkSolver(nlp, subsolver_type = subsolver_type)
   return solve!(solver, nlp; x = x, kwargs...)
 end
 
@@ -177,8 +155,8 @@ function SolverCore.solve!(
   max_iter::Int = typemax(Int),
   max_time::Float64 = 30.0,
   bk_max::Int = 10,
-  monotone::Bool = solver.p.monotone,
-  nm_itmax::Int = solver.p.nm_itmax,
+  monotone::Bool = true,
+  nm_itmax::Int = 25,
   verbose::Int = 0,
   verbose_subsolver::Int = 0,
 ) where {T, V <: AbstractVector{T}}
@@ -208,7 +186,7 @@ function SolverCore.solve!(
   cgtol = one(T)  # Must be ≤ 1.
 
   # Armijo linesearch parameter.
-  β = solver.p.β
+  β = eps(T)^T(1 / 4)
 
   f = obj(nlp, x)
   grad!(nlp, x, ∇f)
@@ -317,7 +295,7 @@ function SolverCore.solve!(
         done = true
         continue
       end
-      α = solver.p.α
+      α = one(T)
       while (bk < bk_max) && (ft > f + β * α * slope)
         bk = bk + 1
         α /= T(1.2)
@@ -410,7 +388,7 @@ function SolverCore.solve!(
     end
 
     # Move on.
-    update!(tr, sNorm)
+    SolverTools.update!(tr, sNorm)
 
     optimal = ∇fNorm2 ≤ ϵ
 

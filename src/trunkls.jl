@@ -410,7 +410,7 @@ function SolverCore.solve!(
     end
 
     # Move on.
-    update!(tr, sNorm)
+    SolverTools.update!(tr, sNorm)
 
     set_objective!(stats, f)
     set_time!(stats, time() - start_time)

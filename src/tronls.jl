@@ -312,7 +312,7 @@ function SolverCore.solve!(
     end
 
     # Update the trust region
-    update!(tr, s_norm)
+    SolverTools.update!(tr, s_norm)
 
     if acceptable(tr)
       num_success_iters += 1
