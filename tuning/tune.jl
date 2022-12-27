@@ -4,7 +4,7 @@ using JSON
 
 # 1. Launch workers
 
-init_workers(;nb_nodes=5, exec_flags="--project=$(@__DIR__)")
+init_workers(;exec_flags="--project=$(@__DIR__)")
 
 # 2. make modules available to all workers:
 @everywhere begin
@@ -61,7 +61,7 @@ function main()
   R = T
   I = Int64
   N = 30
-  problems = (eval(p)(type=Val(T)) for p ∈ filter(x -> x != :ADNLPProblems && x != :scosine, names(OptimizationProblems.ADNLPProblems)))
+  problems = (eval(p)(type=Val(T)) for p ∈ filter(x -> x != :ADNLPProblems, names(OptimizationProblems.ADNLPProblems)))
   problems = Iterators.filter(p -> unconstrained(p) &&  5 ≤ get_nvar(p) ≤ 1000 && get_minimize(p), problems)
 
   # 4. get parameters from solver:
@@ -69,15 +69,15 @@ function main()
 
   params = LBFGSParameterSet{R, I}()
   # 5.4 Define the BBModel:
-  problems = [p for (_, p) in zip(1:N, problems)]
+  # problems = [p for (_, p) in zip(1:N, problems)]
   
-  bbmodel = BBModel(params, solver_func, aux_func, problems;)
+  bbmodel = BBModel(params, solver_func, aux_func, collect(problems);)
   
   @info "Starting NOMAD:"
   best_params, param_opt_problem = solve_bb_model(bbmodel;lb_choice=:C,
   display_all_eval = true,
   # max_time = 300,
-  max_bb_eval = 5,
+  max_bb_eval = 200,
   display_stats = ["BBE", "SOL", "CONS_H", "TIME", "OBJ"],
   )
 
