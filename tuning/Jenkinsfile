@@ -59,19 +59,6 @@ pipeline {
     )
   }
   stages {
-    stage('prepare tuning') {
-      when {
-        expression {env.comment}
-      }
-        steps {
-          sh """
-            julia --project=tuning -E 'using Pkg; Pkg.add(url="https://github.com/ProofOfConceptForJuliSmoothOptimizers/BBModels.jl.git");
-              Pkg.add(url="https://github.com/ProofOfConceptForJuliSmoothOptimizers/SolverTuning.jl.git");
-              Pkg.develop(PackageSpec(url=joinpath(".")));
-            '
-          """
-        }
-    }
     stage('tune software') {
       when {
         expression {env.comment}
