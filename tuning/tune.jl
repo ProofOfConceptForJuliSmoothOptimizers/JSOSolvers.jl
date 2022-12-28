@@ -4,7 +4,7 @@ using JSON
 
 # 1. Launch workers
 
-init_workers(;exec_flags="--project=$(@__DIR__)")
+init_workers(;nb_nodes=15, exec_flags="--project=$(@__DIR__)")
 
 # 2. make modules available to all workers:
 @everywhere begin
