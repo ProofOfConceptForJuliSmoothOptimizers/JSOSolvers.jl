@@ -27,7 +27,7 @@ end
   solver = LBFGSSolver(nlp; mem=value(params.mem), scaling=value(params.scaling))
   stats = GenericExecutionStats(nlp)
   x = nlp.meta.x0
-  return JSOSolvers.SolverCore.solve!(solver, params, nlp, stats; x = x, verbose=0, max_time = 5.0)
+  return JSOSolvers.SolverCore.solve!(solver, params, nlp, stats; x = x, verbose=0, max_time = 30.0)
 end
 
 # 5.2 Define a function that takes a ProblemMetric object. This function must return one real number.
@@ -41,10 +41,11 @@ end
   median_time /= 1.0e9
   # convert memory to Mb:
   memory /= (2^20)
+  # Penalty term:
+  penalty = Float64(!solved) * 5.0 * median_time
 
-  return median_time * memory + counters.neval_obj + (Float64(!solved) * 5.0 * median_time)
+  return median_time * memory + counters.neval_obj + penalty
 end
-
 
 function create_json(param_opt_problem::ParameterOptimizationProblem)
   worker_data = Dict(w_id => [sum(sum(get_times(p);init=0.0) for p in iteration;init=0.0) for iteration in data] for (w_id, data) in param_opt_problem.worker_data)
@@ -58,31 +59,30 @@ function main()
   # 3. Setup problems
   @info "Defining problem set:"
   T = Float64
-  R = T
   I = Int64
   N = 30
-  problems = (eval(p)(type=Val(T)) for p ∈ filter(x -> x != :ADNLPProblems, names(OptimizationProblems.ADNLPProblems)))
+  problems = (eval(p)(type=Val(T)) for p ∈ filter(x -> x != :ADNLPProblems && x != :spmsrtls , names(OptimizationProblems.ADNLPProblems)))
   problems = Iterators.filter(p -> unconstrained(p) &&  5 ≤ get_nvar(p) ≤ 1000 && get_minimize(p), problems)
 
   # 4. get parameters from solver:
   @info "Defining bb model:"
 
-  params = LBFGSParameterSet{R, I}()
+  params = LBFGSParameterSet{T, I}()
   # 5.4 Define the BBModel:
   # problems = [p for (_, p) in zip(1:N, problems)]
-  
-  bbmodel = BBModel(params, solver_func, aux_func, collect(problems);)
+  problems = collect(problems)
+  bbmodel = BBModel(params, solver_func, aux_func, problems;)
   
   @info "Starting NOMAD:"
   best_params, param_opt_problem = solve_bb_model(bbmodel;lb_choice=:C,
   display_all_eval = true,
-  # max_time = 300,
+  # max_time = 60,
   max_bb_eval = 200,
   display_stats = ["BBE", "SOL", "CONS_H", "TIME", "OBJ"],
   )
 
   # create_json(param_opt_problem)
+  rmprocs(workers())
 end
 
 main()
-
