@@ -1,6 +1,7 @@
 using Distributed
 using SolverTuning
 using JSON
+using Dates
 
 # 1. Launch workers
 
@@ -47,9 +48,9 @@ end
   return median_time * memory + counters.neval_obj + penalty
 end
 
-function create_json(param_opt_problem::ParameterOptimizationProblem)
+function create_json(param_opt_problem::ParameterOptimizationProblem, filename::String)
   worker_data = Dict(w_id => [sum(sum(get_times(p);init=0.0) for p in iteration;init=0.0) for iteration in data] for (w_id, data) in param_opt_problem.worker_data)
-  file_path = joinpath(@__DIR__, "plots", "combine", "lbfgs_worker_times_combine_algorithm.json")
+  file_path = joinpath(@__DIR__, "plots", "combine", "$(filename)_$(now()).json")
   open(file_path, "w") do f
     JSON.print(f, worker_data)
   end
@@ -58,10 +59,10 @@ end
 function main()
   # 3. Setup problems
   @info "Defining problem set:"
-  T = Float64
+  T = Float32
   I = Int64
   N = 30
-  problems = (eval(p)(type=Val(T)) for p ∈ filter(x -> x != :ADNLPProblems && x != :spmsrtls , names(OptimizationProblems.ADNLPProblems)))
+  problems = (eval(p)(type=Val(T)) for p ∈ filter(x -> x ∉ [:ADNLPProblems, :spmsrtls, :scosine], names(OptimizationProblems.ADNLPProblems)))
   problems = Iterators.filter(p -> unconstrained(p) &&  5 ≤ get_nvar(p) ≤ 1000 && get_minimize(p), problems)
 
   # 4. get parameters from solver:
@@ -81,7 +82,7 @@ function main()
   display_stats = ["BBE", "SOL", "CONS_H", "TIME", "OBJ"],
   )
 
-  # create_json(param_opt_problem)
+  create_json(param_opt_problem, "lbfgs_float32")
   rmprocs(workers())
 end
 

@@ -20,8 +20,8 @@ struct LBFGSParameterSet{R <: AbstractFloat,I  <: Integer} <: AbstractParameterS
     p_set = new{R, I}(
       Parameter(mem, IntegerRange(I(5), I(30))),
       Parameter(scaling, BinaryRange()),
-      Parameter(τ₀, RealInterval(R(0), R(1/2);lower_open=true, upper_open=true)),
-      Parameter(τ₁, RealInterval(R(1/2), R(1);upper_open=true)),
+      Parameter(τ₀, RealInterval(eps(R), R(1/2);)),
+      Parameter(τ₁, RealInterval(R(2/3), R(1 - eps(R));)),
       Parameter(bk_max, IntegerRange(I(5), I(15))),
       Parameter(bW_max, IntegerRange(I(1), I(5))),
     )
