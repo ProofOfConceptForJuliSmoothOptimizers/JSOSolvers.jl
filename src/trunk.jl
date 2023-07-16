@@ -388,7 +388,7 @@ function SolverCore.solve!(
     end
 
     # Move on.
-    update!(tr, sNorm)
+    SolverTools.update!(tr, sNorm)
 
     optimal = ∇fNorm2 ≤ ϵ
 

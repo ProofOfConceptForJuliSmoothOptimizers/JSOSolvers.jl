@@ -3,6 +3,9 @@ module JSOSolvers
 # stdlib
 using LinearAlgebra, Logging, Printf
 
+# SolverParameters package for parameter support
+using SolverParameters
+
 # JSO packages
 using Krylov, LinearOperators, NLPModels, NLPModelsModifiers, SolverCore, SolverTools
 
@@ -13,6 +16,7 @@ export solve!
 SolverCore.eval_fun(nls::AbstractNLSModel) = neval_residual(nls) + neval_cons(nls)
 
 # Unconstrained solvers
+include("parameters.jl")
 include("lbfgs.jl")
 include("trunk.jl")
 include("R2.jl")

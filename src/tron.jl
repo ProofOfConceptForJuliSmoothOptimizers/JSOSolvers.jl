@@ -204,7 +204,7 @@ function SolverCore.solve!(
   project_step!(gpx, x, gx, ℓ, u, -one(T))
   πx = nrm2(n, gpx)
   ϵ = atol + rtol * πx
-  fmin = min(-one(T), fx) / eps(eltype(x))
+  fmin = min(-one(T), fx) / eps(T)
   optimal = πx <= ϵ
   unbounded = fx < fmin
 
@@ -286,7 +286,7 @@ function SolverCore.solve!(
     end
 
     # Update the trust region
-    update!(tr, s_norm)
+    SolverTools.update!(tr, s_norm)
 
     if acceptable(tr)
       num_success_iters += 1

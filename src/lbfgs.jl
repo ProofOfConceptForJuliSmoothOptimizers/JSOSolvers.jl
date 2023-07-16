@@ -77,16 +77,18 @@ mutable struct LBFGSSolver{T, V, Op <: AbstractLinearOperator{T}, M <: AbstractN
   h::LineModel{T, V, M}
 end
 
-function LBFGSSolver(nlp::M; mem::Int = 5) where {T, V, M <: AbstractNLPModel{T, V}}
+function LBFGSSolver(nlp::M; mem::I = 5, scaling::Bool = true) where {T, V, I <: Integer, M <: AbstractNLPModel{T, V}}
   nvar = nlp.meta.nvar
   x = V(undef, nvar)
   d = V(undef, nvar)
   xt = V(undef, nvar)
   gx = V(undef, nvar)
   gt = V(undef, nvar)
-  H = InverseLBFGSOperator(T, nvar, mem = mem, scaling = true)
+
+  H = InverseLBFGSOperator(T, nvar, mem = mem, scaling = scaling)
   h = LineModel(nlp, x, d)
   Op = typeof(H)
+
   return LBFGSSolver{T, V, Op, M}(x, xt, gx, gt, d, H, h)
 end
 
@@ -101,17 +103,32 @@ function SolverCore.reset!(solver::LBFGSSolver, nlp::AbstractNLPModel)
 end
 
 @doc (@doc LBFGSSolver) function lbfgs(
-  nlp::AbstractNLPModel;
+  nlp::AbstractNLPModel{T, V};
   x::V = nlp.meta.x0,
-  mem::Int = 5,
+  mem::Int=5,
+  scaling::Bool=true,
+  τ₀::T=max(T(1.0e-4), sqrt(eps(T))),
+  τ₁::T=T(0.999),
+  bk_max::Int=10,
+  bW_max::Int=5,
   kwargs...,
-) where {V}
-  solver = LBFGSSolver(nlp; mem = mem)
-  return solve!(solver, nlp; x = x, kwargs...)
+) where {T, V}
+  params = LBFGSParameterSet{T, Int}(;
+  mem = mem,
+  scaling = scaling,
+  τ₀ = τ₀,
+  τ₁ = τ₁,
+  bk_max = bk_max,
+  bW_max = bW_max
+  )
+  solver = LBFGSSolver(nlp; mem=mem, scaling=scaling)
+  stats = GenericExecutionStats(nlp)
+  return solve!(solver, params, nlp, stats; x = x, kwargs...)
 end
 
 function SolverCore.solve!(
   solver::LBFGSSolver{T, V},
+  params::LBFGSParameterSet{R, I},
   nlp::AbstractNLPModel{T, V},
   stats::GenericExecutionStats{T, V};
   callback = (args...) -> nothing,
@@ -121,17 +138,18 @@ function SolverCore.solve!(
   max_eval::Int = -1,
   max_iter::Int = typemax(Int),
   max_time::Float64 = 30.0,
-  τ₁::T = T(0.9999),
-  bk_max::Int = 25,
   verbose::Int = 0,
-  verbose_subsolver::Int = 0,
-) where {T, V}
+) where {T, V, R <: AbstractFloat, I <: Integer}
   if !(nlp.meta.minimize)
     error("lbfgs only works for minimization problem")
   end
   if !unconstrained(nlp)
     error("lbfgs should only be called for unconstrained problems. Try tron instead")
   end
+  τ₀ = value(params.τ₀)
+  τ₁ = value(params.τ₁)
+  bk_max = value(params.bk_max)
+  bW_max = value(params.bW_max)
 
   reset!(stats)
   start_time = time()
@@ -195,7 +213,7 @@ function SolverCore.solve!(
 
     # Perform improved Armijo linesearch.
     t, good_grad, ft, nbk, nbW =
-      armijo_wolfe(h, f, slope, ∇ft, τ₁ = τ₁, bk_max = bk_max, verbose = Bool(verbose_subsolver))
+      armijo_wolfe(h, f, slope, ∇ft, τ₀ = τ₀, τ₁ = τ₁, bk_max = bk_max, bW_max = bW_max, verbose = false)
 
     verbose > 0 &&
       mod(stats.iter, verbose) == 0 &&

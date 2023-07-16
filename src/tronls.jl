@@ -188,8 +188,8 @@ function SolverCore.solve!(
   end
 
   reset!(stats)
-  ℓ = T.(nlp.meta.lvar)
-  u = T.(nlp.meta.uvar)
+  ℓ = nlp.meta.lvar
+  u = nlp.meta.uvar
   n = nlp.meta.nvar
   m = nlp.nls_meta.nequ
 
@@ -211,9 +211,8 @@ function SolverCore.solve!(
 
   x .= max.(ℓ, min.(x, u))
   Fx = F(x)
-  fx = dot(Fx, Fx) / 2
   Ax = A(x)
-  mul!(gx, Ax', Fx)
+  fx, gx = objgrad!(nlp, x, gx, Fx, recompute = false)
   gt = solver.gt
 
   Fc = solver.Fc
@@ -223,7 +222,7 @@ function SolverCore.solve!(
   project_step!(gpx, x, gx, ℓ, u, -one(T))
   πx = nrm2(n, gpx)
   ϵ = atol + rtol * πx
-  fmin = min(-one(T), fx) / eps(eltype(x))
+  fmin = min(-one(T), fx) / eps(T)
   optimal = πx <= ϵ
   unbounded = fx < fmin
   ϵF = Fatol + Frtol * 2 * √fx
@@ -294,7 +293,7 @@ function SolverCore.solve!(
     slope = dot(m, Fx, As)
     qs = dot(As, As) / 2 + slope
     Fx = F(x)
-    fx = dot(Fx, Fx) / 2
+    fx = obj(nlp, x, Fx, recompute = false)
 
     ared, pred = aredpred!(tr, nlp, fc, fx, qs, x, s, slope)
     if pred ≥ 0
@@ -313,7 +312,7 @@ function SolverCore.solve!(
     end
 
     # Update the trust region
-    update!(tr, s_norm)
+    SolverTools.update!(tr, s_norm)
 
     if acceptable(tr)
       num_success_iters += 1
@@ -322,7 +321,7 @@ function SolverCore.solve!(
         gx .= tr.gt
         tr.good_grad = false
       else
-        gx .= Ax' * Fx
+        grad!(nlp, x, gx, Fx, recompute = false)
       end
       project_step!(gpx, x, gx, ℓ, u, -one(T))
       πx = nrm2(n, gpx)
