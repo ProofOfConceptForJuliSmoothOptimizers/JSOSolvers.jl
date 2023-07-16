@@ -53,7 +53,7 @@ function main()
   I = Int64
   N = 3
   problems = (eval(p)(type=Val(T)) for p ∈ filter(x -> x ∉ [:ADNLPProblems, :spmsrtls, :scosine], names(OptimizationProblems.ADNLPProblems)))
-  problems = Iterators.filter(p -> unconstrained(p) &&  1 ≤ get_nvar(p) && get_minimize(p), problems)
+  problems = Iterators.filter(p -> unconstrained(p) &&  1 ≤ get_nvar(p) ≤ 500 && get_minimize(p), problems)
 
   # 4. get parameters from solver:
   @info "Defining bb model:"

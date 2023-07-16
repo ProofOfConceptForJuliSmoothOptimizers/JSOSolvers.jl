@@ -18,7 +18,7 @@ struct LBFGSParameterSet{R <: AbstractFloat,I  <: Integer} <: AbstractParameterS
     ) where {R <: AbstractFloat, I <: Integer}
     (τ₀ < τ₁) || throw(DomainError("Inavlid τ₀ and/or τ₁: slope factor should satisfy τ₁ > τ₀."))
     p_set = new{R, I}(
-      Parameter(mem, IntegerRange(I(5), I(30))),
+      Parameter(mem, IntegerRange(I(1), I(10))),
       Parameter(scaling, BinaryRange()),
       Parameter(τ₀, RealInterval(eps(R), R(1/2);)),
       Parameter(τ₁, RealInterval(R(2/3), R(1 - eps(R));)),
